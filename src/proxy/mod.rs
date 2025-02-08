@@ -1,4 +1,3 @@
+pub mod config;
 pub mod handler;
 pub mod stream;
-pub mod config;
-

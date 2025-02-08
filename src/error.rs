@@ -6,13 +6,13 @@ use thiserror::Error;
 pub enum AppError {
     #[error("Authentication error: {0}")]
     Auth(String),
-    
+
     #[error("Proxy error: {0}")]
     Proxy(String),
-    
+
     #[error("Internal server error: {0}")]
     Internal(String),
-    
+
     #[error("Upstream service error: {0}")]
     Upstream(String),
 
@@ -25,7 +25,9 @@ impl ResponseError for AppError {
         match self {
             AppError::Auth(msg) => HttpResponse::Unauthorized().json(json!({ "error": msg })),
             AppError::Proxy(msg) => HttpResponse::BadGateway().json(json!({ "error": msg })),
-            AppError::Internal(msg) => HttpResponse::InternalServerError().json(json!({ "error": msg })),
+            AppError::Internal(msg) => {
+                HttpResponse::InternalServerError().json(json!({ "error": msg }))
+            }
             AppError::Upstream(msg) => HttpResponse::BadGateway().json(json!({ "error": msg })),
             AppError::SerdeJsonError(err) => {
                 HttpResponse::InternalServerError().json(json!({ "error": err.to_string() }))

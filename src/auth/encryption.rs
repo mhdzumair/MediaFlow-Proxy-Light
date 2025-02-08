@@ -1,6 +1,9 @@
-use aes::{cipher::{generic_array, BlockDecrypt, BlockEncrypt, KeyInit}, Aes256};
+use aes::{
+    cipher::{generic_array, BlockDecrypt, BlockEncrypt, KeyInit},
+    Aes256,
+};
 use anyhow::Result;
-use base64::{Engine as _, engine::general_purpose::URL_SAFE};
+use base64::{engine::general_purpose::URL_SAFE, Engine as _};
 use rand::RngCore;
 use serde::{Deserialize, Serialize};
 use std::time::{SystemTime, UNIX_EPOCH};
@@ -69,7 +72,8 @@ impl EncryptionHandler {
 
     pub fn decrypt(&self, token: &str, client_ip: Option<&str>) -> Result<ProxyData, AppError> {
         // Decode base64
-        let encrypted_data = URL_SAFE.decode(token)
+        let encrypted_data = URL_SAFE
+            .decode(token)
             .map_err(|e| AppError::Auth(format!("Invalid token format: {}", e)))?;
 
         if encrypted_data.len() < 16 {
@@ -87,7 +91,8 @@ impl EncryptionHandler {
         }
 
         // Unpad the data
-        let unpadded_data = self.unpad_data(&decrypted)
+        let unpadded_data = self
+            .unpad_data(&decrypted)
             .map_err(|_| AppError::Auth("Invalid padding".to_string()))?;
 
         // Deserialize the JSON data

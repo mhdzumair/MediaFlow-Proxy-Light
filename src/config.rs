@@ -1,8 +1,8 @@
+use crate::proxy::config::ProxyRouteConfig;
+use config::{Map, Value};
 use serde::Deserialize;
 use std::collections::HashMap;
 use std::path::Path;
-use config::{Map, Value};
-use crate::proxy::config::ProxyRouteConfig;
 use tracing::warn;
 
 #[derive(Debug, Deserialize, Clone)]
@@ -64,7 +64,7 @@ impl Config {
         builder = builder.add_source(
             config::Environment::with_prefix("APP")
                 .separator("__")
-                .try_parsing(true)
+                .try_parsing(true),
         );
 
         // Handle TRANSPORT_ROUTES environment variable
@@ -72,7 +72,8 @@ impl Config {
             match serde_json::from_str::<HashMap<String, ProxyRouteConfig>>(&routes_json) {
                 Ok(routes) => {
                     // Convert to config::Map and config::Value
-                    let routes_map = routes.into_iter()
+                    let routes_map = routes
+                        .into_iter()
                         .map(|(k, v)| {
                             let mut inner_map = Map::new();
                             inner_map.insert("proxy".into(), Value::from(v.proxy));
@@ -84,12 +85,14 @@ impl Config {
                         })
                         .collect::<Map<String, Value>>();
 
-                    builder = builder.set_override("proxy.transport_routes", Value::from(routes_map))?;
+                    builder =
+                        builder.set_override("proxy.transport_routes", Value::from(routes_map))?;
                 }
                 Err(e) => {
-                    return Err(config::ConfigError::Message(
-                        format!("Failed to parse TRANSPORT_ROUTES: {}", e)
-                    ));
+                    return Err(config::ConfigError::Message(format!(
+                        "Failed to parse TRANSPORT_ROUTES: {}",
+                        e
+                    )));
                 }
             }
         }

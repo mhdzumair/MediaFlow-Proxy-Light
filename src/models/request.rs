@@ -41,7 +41,4 @@ pub const SUPPORTED_RESPONSE_HEADERS: &[&str] = &[
     "expires",
 ];
 
-pub const SUPPORTED_REQUEST_HEADERS: &[&str] = &[
-    "range",
-    "if-range",
-];
+pub const SUPPORTED_REQUEST_HEADERS: &[&str] = &["range", "if-range"];

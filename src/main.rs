@@ -106,10 +106,7 @@ async fn main() -> std::io::Result<()> {
                     .route("/generate_url", web::post().to(handler::generate_url))
                     .route("/ip", web::get().to(handler::get_public_ip)),
             )
-            .service(
-                web::scope("/health")
-                    .route("", web::get().to(|| async { "OK" })),
-            )
+            .service(web::scope("/health").route("", web::get().to(|| async { "OK" })))
             // Configure default error handlers
             .default_service(web::route().to(|| async {
                 tracing::warn!(target: "request", "Not found request");

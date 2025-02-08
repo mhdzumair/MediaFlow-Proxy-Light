@@ -1,7 +1,7 @@
+use regex::Regex;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use url::Url;
-use regex::Regex;
 
 use crate::config::ProxyConfig;
 
@@ -45,7 +45,7 @@ impl ProxyRouter {
                 .replace(".", "\\.")
                 .replace("*", "[^/]*")
                 .replace("all://", "(http|https)://");
-            
+
             match Regex::new(&format!("^{}", pattern)) {
                 Ok(regex) => {
                     routes.push(ProxyRoute {

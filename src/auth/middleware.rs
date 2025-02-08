@@ -1,6 +1,3 @@
-use std::future::{ready, Ready};
-use std::rc::Rc;
-use std::sync::Arc;
 use actix_web::HttpMessage;
 use actix_web::{
     dev::{forward_ready, Service, ServiceRequest, ServiceResponse, Transform},
@@ -8,15 +5,14 @@ use actix_web::{
 };
 use futures::future::LocalBoxFuture;
 use serde_json::Value;
+use std::future::{ready, Ready};
+use std::rc::Rc;
+use std::sync::Arc;
 
 use crate::auth::encryption::{EncryptionHandler, ProxyData};
 use crate::error::AppError;
 
-const OPEN_ENDPOINTS: &[&str] = &[
-    "/proxy/generate_url",
-    "/health",
-];
-
+const OPEN_ENDPOINTS: &[&str] = &["/proxy/generate_url", "/health"];
 
 #[derive(Clone)]
 pub struct AuthMiddleware {
@@ -29,7 +25,7 @@ impl AuthMiddleware {
         let encryption_handler = if !api_password.is_empty() {
             Some(Arc::new(
                 EncryptionHandler::new(api_password.as_bytes())
-                    .expect("Failed to create encryption handler")
+                    .expect("Failed to create encryption handler"),
             ))
         } else {
             None
@@ -46,9 +42,14 @@ impl AuthMiddleware {
         for pair in query_string.split('&') {
             if let Some((key, value)) = pair.split_once('=') {
                 if !key.is_empty() && !value.is_empty() {
-                    params.insert(key.to_string(), Value::String(urlencoding::decode(value)
-                        .unwrap_or_else(|_| value.into())
-                        .into_owned()));
+                    params.insert(
+                        key.to_string(),
+                        Value::String(
+                            urlencoding::decode(value)
+                                .unwrap_or_else(|_| value.into())
+                                .into_owned(),
+                        ),
+                    );
                 }
             }
         }
@@ -129,10 +130,17 @@ where
                         .map_err(Error::from)?;
 
                     // validate api password
-                    if proxy_data.query_params.as_ref().and_then(|v| v.get("api_password"))
-                        .and_then(|v| v.as_str()) != Some(&api_password)
+                    if proxy_data
+                        .query_params
+                        .as_ref()
+                        .and_then(|v| v.get("api_password"))
+                        .and_then(|v| v.as_str())
+                        != Some(&api_password)
                     {
-                        return Err(AppError::Auth("Invalid or missing authentication".to_string()).into());
+                        return Err(AppError::Auth(
+                            "Invalid or missing authentication".to_string(),
+                        )
+                        .into());
                     }
 
                     // Store proxy data in request extensions
@@ -149,24 +157,30 @@ where
                         let proxy_data = ProxyData {
                             destination: destination.to_string(),
                             query_params: Some(Value::Object(query_params.clone())),
-                            request_headers: Some(Value::Object(query_params.iter()
-                                .filter_map(|(k, v)| {
-                                    if k.starts_with("h_") {
-                                        Some((k[2..].to_string(), v.clone()))
-                                    } else {
-                                        None
-                                    }
-                                })
-                                .collect())),
-                            response_headers: Some(Value::Object(query_params.iter()
-                                .filter_map(|(k, v)| {
-                                    if k.starts_with("r_") {
-                                        Some((k[2..].to_string(), v.clone()))
-                                    } else {
-                                        None
-                                    }
-                                })
-                                .collect())),
+                            request_headers: Some(Value::Object(
+                                query_params
+                                    .iter()
+                                    .filter_map(|(k, v)| {
+                                        if k.starts_with("h_") {
+                                            Some((k[2..].to_string(), v.clone()))
+                                        } else {
+                                            None
+                                        }
+                                    })
+                                    .collect(),
+                            )),
+                            response_headers: Some(Value::Object(
+                                query_params
+                                    .iter()
+                                    .filter_map(|(k, v)| {
+                                        if k.starts_with("r_") {
+                                            Some((k[2..].to_string(), v.clone()))
+                                        } else {
+                                            None
+                                        }
+                                    })
+                                    .collect(),
+                            )),
                             exp: None,
                             ip: None,
                         };
