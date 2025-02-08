@@ -63,12 +63,12 @@ impl Config {
         // Add configuration from environment
         builder = builder.add_source(
             config::Environment::with_prefix("APP")
-                .separator("_")
+                .separator("__")
                 .try_parsing(true)
         );
 
         // Handle TRANSPORT_ROUTES environment variable
-        if let Ok(routes_json) = std::env::var("TRANSPORT_ROUTES") {
+        if let Ok(routes_json) = std::env::var("APP__PROXY__TRANSPORT_ROUTES") {
             match serde_json::from_str::<HashMap<String, ProxyRouteConfig>>(&routes_json) {
                 Ok(routes) => {
                     // Convert to config::Map and config::Value
