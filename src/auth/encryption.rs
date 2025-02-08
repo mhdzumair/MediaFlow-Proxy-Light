@@ -57,8 +57,8 @@ impl EncryptionHandler {
         // Encrypt the data
         let mut encrypted_data = padded_data.clone();
         for chunk in encrypted_data.chunks_mut(16) {
-            let mut block = generic_array::GenericArray::from_mut_slice(chunk);
-            self.cipher.encrypt_block(&mut block);
+            let block = generic_array::GenericArray::from_mut_slice(chunk);
+            self.cipher.encrypt_block(block);
         }
 
         // Combine IV and encrypted data
@@ -86,8 +86,8 @@ impl EncryptionHandler {
 
         // Decrypt the data
         for chunk in decrypted.chunks_mut(16) {
-            let mut block = generic_array::GenericArray::from_mut_slice(chunk);
-            self.cipher.decrypt_block(&mut block);
+            let block = generic_array::GenericArray::from_mut_slice(chunk);
+            self.cipher.decrypt_block(block);
         }
 
         // Unpad the data

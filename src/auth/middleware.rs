@@ -161,11 +161,7 @@ where
                                 query_params
                                     .iter()
                                     .filter_map(|(k, v)| {
-                                        if k.starts_with("h_") {
-                                            Some((k[2..].to_string(), v.clone()))
-                                        } else {
-                                            None
-                                        }
+                                        k.strip_prefix("h_").map(|stripped| (stripped.to_string(), v.clone()))
                                     })
                                     .collect(),
                             )),
@@ -173,11 +169,7 @@ where
                                 query_params
                                     .iter()
                                     .filter_map(|(k, v)| {
-                                        if k.starts_with("r_") {
-                                            Some((k[2..].to_string(), v.clone()))
-                                        } else {
-                                            None
-                                        }
+                                        k.strip_prefix("r_").map(|stripped| (stripped.to_string(), v.clone()))
                                     })
                                     .collect(),
                             )),
