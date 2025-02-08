@@ -144,21 +144,37 @@ where
             // Check for direct API password
             if let Some(password) = query_params.get("api_password").and_then(|v| v.as_str()) {
                 if password == api_password {
-                    // Create proxy data from query parameters
-                    let proxy_data = ProxyData {
-                        destination: query_params.get("d")
-                            .and_then(|v| v.as_str())
-                            .ok_or_else(|| AppError::Auth("Missing destination URL".to_string()))?
-                            .to_string(),
-                        query_params: Some(Value::Object(query_params.clone())),
-                        request_headers: None,
-                        response_headers: None,
-                        exp: None,
-                        ip: None,
-                    };
-                    
-                    // Store proxy data in request extensions
-                    req.extensions_mut().insert(proxy_data);
+                    if let Some(destination) = query_params.get("d").and_then(|v| v.as_str()) {
+                        // Create proxy data from query parameters
+                        let proxy_data = ProxyData {
+                            destination: destination.to_string(),
+                            query_params: Some(Value::Object(query_params.clone())),
+                            request_headers: Some(Value::Object(query_params.iter()
+                                .filter_map(|(k, v)| {
+                                    if k.starts_with("h_") {
+                                        Some((k[2..].to_string(), v.clone()))
+                                    } else {
+                                        None
+                                    }
+                                })
+                                .collect())),
+                            response_headers: Some(Value::Object(query_params.iter()
+                                .filter_map(|(k, v)| {
+                                    if k.starts_with("r_") {
+                                        Some((k[2..].to_string(), v.clone()))
+                                    } else {
+                                        None
+                                    }
+                                })
+                                .collect())),
+                            exp: None,
+                            ip: None,
+                        };
+
+                        // Store proxy data in request extensions
+                        req.extensions_mut().insert(proxy_data);
+                        return service.call(req).await;
+                    }
                     return service.call(req).await;
                 }
             }
