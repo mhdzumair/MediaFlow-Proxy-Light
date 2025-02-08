@@ -1,51 +1,103 @@
 use std::pin::Pin;
 use actix_web::web::Bytes;
 use futures::{Stream, StreamExt};
-use reqwest::Client;
-use tokio::time::Duration;
+use reqwest::{Client, Proxy, Response};
+use tokio::time::{Duration, timeout};
 use tracing::{error, info};
 
 use crate::{
     config::ProxyConfig,
     error::{AppError, AppResult},
+    proxy::config::ProxyRouter,
 };
 
 #[derive(Clone)]
 pub struct StreamManager {
     client: Client,
     config: ProxyConfig,
+    proxy_router: ProxyRouter,
 }
 
 impl StreamManager {
     pub fn new(config: ProxyConfig) -> Self {
-        let client = Client::builder()
+        let proxy_router = ProxyRouter::from_config(&config);
+        let client = Self::create_client(&config, &proxy_router);
+
+        Self { 
+            client,
+            config,
+            proxy_router,
+        }
+    }
+
+    fn create_client(config: &ProxyConfig, proxy_router: &ProxyRouter) -> Client {
+        let follow_redirects = config.follow_redirects;
+        let mut builder = Client::builder()
             .connect_timeout(Duration::from_secs(config.connect_timeout))
-            .timeout(Duration::from_secs(config.stream_timeout))
+            // Remove the overall timeout to prevent stream interruption
+            .pool_idle_timeout(Duration::from_secs(90))
+            .pool_max_idle_per_host(0) // Disable connection pooling
             .redirect(reqwest::redirect::Policy::custom(move |attempt| {
-                if config.follow_redirects {
+                if follow_redirects {
                     attempt.follow()
                 } else {
                     attempt.stop()
                 }
-            }))
-            .build()
-            .expect("Failed to create HTTP client");
+            }));
 
-        Self { client, config }
+        if let Some(default_proxy) = proxy_router.default_proxy() {
+            if let Ok(proxy) = Proxy::all(default_proxy) {
+                builder = builder.proxy(proxy);
+            }
+        }
+
+        builder.build().expect("Failed to create HTTP client")
     }
 
-    pub async fn create_stream(
+    pub async fn make_request(
         &self,
         url: String,
         headers: reqwest::header::HeaderMap,
-    ) -> AppResult<(reqwest::header::HeaderMap, impl Stream<Item = Result<Bytes, AppError>>)> {
-        let response = self
-            .client
-            .get(&url)
-            .headers(headers)
-            .send()
-            .await
-            .map_err(|e| AppError::Proxy(format!("Failed to connect to upstream: {}", e)))?;
+    ) -> AppResult<Response> {
+        let proxy_config = self.proxy_router.get_proxy_config(&url);
+        
+        let client = if let Some(config) = proxy_config {
+            let mut builder = Client::builder()
+                .connect_timeout(Duration::from_secs(self.config.connect_timeout))
+                .pool_idle_timeout(Duration::from_secs(90))
+                .pool_max_idle_per_host(0);
+
+            if config.proxy {
+                if let Some(proxy_url) = config.proxy_url.as_ref() {
+                    match Proxy::all(proxy_url) {
+                        Ok(proxy) => {
+                            info!("Using proxy {} for {}", proxy_url, url);
+                            builder = builder.proxy(proxy);
+                        }
+                        Err(e) => {
+                            error!("Failed to create proxy for {}: {}", proxy_url, e);
+                            return Err(AppError::Internal(format!("Failed to create proxy: {}", e)));
+                        }
+                    }
+                }
+            }
+
+            if !config.verify_ssl {
+                tracing::warn!("SSL verification disabled for {}", url);
+                builder = builder.danger_accept_invalid_certs(true);
+            }
+
+            builder.build().map_err(|e| AppError::Internal(format!("Failed to create client: {}", e)))?
+        } else {
+            self.client.clone()
+        };
+
+        let response = timeout(
+            Duration::from_secs(self.config.connect_timeout),
+            client.get(&url).headers(headers).send()
+        ).await
+        .map_err(|e| AppError::Proxy(format!("Connection timeout: {}", e)))?
+        .map_err(|e| AppError::Proxy(format!("Failed to connect to upstream: {}", e)))?;
 
         if !response.status().is_success() {
             return Err(AppError::Upstream(format!(
@@ -54,14 +106,32 @@ impl StreamManager {
             )));
         }
 
-        let response_headers = response.headers().clone();
-        let stream = response
-            .bytes_stream()
-            .map(|result| {
-                result.map_err(|e| AppError::Proxy(format!("Stream error: {}", e)))
-            });
+        Ok(response)
+    }
 
-        Ok((response_headers, stream))
+    pub async fn create_stream(
+        &self,
+        url: String,
+        headers: reqwest::header::HeaderMap,
+        is_head: bool,
+    ) -> AppResult<(reqwest::header::HeaderMap, Option<impl Stream<Item = Result<Bytes, AppError>>>)> {
+        // Always make a GET request but don't read the body for HEAD
+        let response = self.make_request(url, headers).await?;
+        let response_headers = response.headers().clone();
+
+        if is_head {
+            // For HEAD requests, return only headers
+            Ok((response_headers, None))
+        } else {
+            // For GET requests, return headers and stream
+            let stream = response
+                .bytes_stream()
+                .map(|result| {
+                    result.map_err(|e| AppError::Proxy(format!("Stream error: {}", e)))
+                });
+
+            Ok((response_headers, Some(stream)))
+        }
     }
 
     pub async fn stream_with_progress<S>(

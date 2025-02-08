@@ -1,0 +1,20 @@
+[server]
+host = "0.0.0.0"
+port = 8888
+workers = 4  # Number of worker threads. Defaults to number of CPU cores
+
+[proxy]
+connect_timeout = 30  # Connection timeout in seconds
+follow_redirects = true
+buffer_size = 8192    # Streaming buffer size in bytes
+proxy_url = ""  # Default proxy URL. Supported http/https/socks4/socks5
+all_proxy = false
+
+# Transport routes configuration
+[proxy.transport_routes]
+"all://*.streaming.com" = { proxy = true, proxy_url = "socks5://streaming-proxy:1080", verify_ssl = true }
+"all://*.internal.com" = { proxy = false, verify_ssl = true }
+"https://api.service.com" = { proxy = true, verify_ssl = false }
+
+[auth]
+api_password = "your-password"  # Replace with a secure secret key

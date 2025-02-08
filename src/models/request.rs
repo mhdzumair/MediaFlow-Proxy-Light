@@ -25,6 +25,7 @@ pub struct GenerateUrlRequest {
     pub response_headers: HashMap<String, String>,
     pub expiration: Option<u64>,
     pub ip: Option<String>,
+    pub api_password: Option<String>,
 }
 
 pub const SUPPORTED_RESPONSE_HEADERS: &[&str] = &[

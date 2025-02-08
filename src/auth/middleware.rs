@@ -12,6 +12,12 @@ use serde_json::Value;
 use crate::auth::encryption::{EncryptionHandler, ProxyData};
 use crate::error::AppError;
 
+const OPEN_ENDPOINTS: &[&str] = &[
+    "/proxy/generate_url",
+    "/health",
+];
+
+
 #[derive(Clone)]
 pub struct AuthMiddleware {
     encryption_handler: Option<Arc<EncryptionHandler>>,
@@ -89,12 +95,17 @@ where
 
     forward_ready!(service);
 
-    fn call(&self, mut req: ServiceRequest) -> Self::Future {
+    fn call(&self, req: ServiceRequest) -> Self::Future {
         let service = self.service.clone();
         let encryption_handler = self.encryption_handler.clone();
         let api_password = self.api_password.clone();
 
         Box::pin(async move {
+            // Check if path is in open endpoints
+            if OPEN_ENDPOINTS.iter().any(|path| req.path() == *path) {
+                return service.call(req).await;
+            }
+
             // If API password is not set, allow all requests
             if api_password.is_empty() {
                 return service.call(req).await;
@@ -116,6 +127,13 @@ where
                     let proxy_data = handler
                         .decrypt(token, client_ip.as_deref())
                         .map_err(Error::from)?;
+
+                    // validate api password
+                    if proxy_data.query_params.as_ref().and_then(|v| v.get("api_password"))
+                        .and_then(|v| v.as_str()) != Some(&api_password)
+                    {
+                        return Err(AppError::Auth("Invalid or missing authentication".to_string()).into());
+                    }
 
                     // Store proxy data in request extensions
                     req.extensions_mut().insert(proxy_data);
