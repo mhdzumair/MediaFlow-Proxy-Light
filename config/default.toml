@@ -1,0 +1,13 @@
+[server]
+host = "0.0.0.0"
+port = 8888
+workers = 4  # Number of worker threads. Defaults to number of CPU cores
+
+[proxy]
+connect_timeout = 30  # Connection timeout in seconds
+stream_timeout = 60   # Stream timeout in seconds
+follow_redirects = true
+buffer_size = 8192    # Streaming buffer size in bytes
+
+[auth]
+api_password = "your-secret-key-here"  # Replace with a secure secret key
