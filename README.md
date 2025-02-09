@@ -79,7 +79,54 @@ sudo mv mediaflow-proxy-light-linux-x86_64 /usr/local/bin/mediaflow-proxy-light
 Configuration can be provided via a TOML file or environment variables.
 
 ### TOML Configuration
-See [config-example.toml](/config-example.toml) for a complete example.
+1. Download the example configuration:
+```bash
+wget https://raw.githubusercontent.com/mhdzumair/MediaFlow-Proxy-Light/main/config-example.toml -O config.toml
+```
+
+2. Edit the configuration file according to your needs:
+```bash
+nano config.toml
+```
+
+3. Set the configuration path based on your installation method:
+
+#### Binary Installation
+```bash
+# Set config path
+export CONFIG_PATH=/path/to/your/config.toml
+
+# Run the proxy
+mediaflow-proxy-light
+```
+
+#### Docker Installation
+```bash
+docker run -d \
+  -p 8888:8888 \
+  -v $(pwd)/config.toml:/app/config.toml \
+  -e CONFIG_PATH=/app/config.toml \
+  ghcr.io/mhdzumair/mediaflow-proxy-light:latest
+```
+
+#### Systemd Service
+If you're running as a system service, add the environment variable to your service file:
+
+```ini
+// filepath: /etc/systemd/system/mediaflow-proxy-light.service
+[Unit]
+Description=MediaFlow Proxy Light Service
+After=network.target
+
+[Service]
+Environment=CONFIG_PATH=/etc/mediaflow-proxy-light/config.toml
+ExecStart=/usr/local/bin/mediaflow-proxy-light
+User=mediaflow
+Restart=always
+
+[Install]
+WantedBy=multi-user.target
+```
 
 ### Environment Variables
 
