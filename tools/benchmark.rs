@@ -1,13 +1,13 @@
 #[cfg(feature = "benchmark")]
 use clap::Parser;
+use futures_util::TryStreamExt;
 #[cfg(feature = "benchmark")]
 use reqwest::Client;
-use std::time::{Duration, Instant};
-use tokio::time::sleep;
 use std::error::Error;
 use std::sync::Arc;
+use std::time::{Duration, Instant};
 use tokio::sync::{Mutex, Semaphore};
-use futures_util::TryStreamExt;
+use tokio::time::sleep;
 
 #[cfg(feature = "benchmark")]
 #[derive(Parser, Debug)]
@@ -91,32 +91,35 @@ struct BenchmarkResults {
 }
 
 #[cfg(feature = "benchmark")]
-async fn get_container_stats(docker: &bollard::Docker, container_id: &str) -> Result<(f64, u64), Box<dyn Error>> {
+async fn get_container_stats(
+    docker: &bollard::Docker,
+    container_id: &str,
+) -> Result<(f64, u64), Box<dyn Error>> {
     use bollard::container::StatsOptions;
     use futures_util::StreamExt;
-    
+
     let stats_options = StatsOptions {
-        stream: false,  // We want a single snapshot
+        stream: false, // We want a single snapshot
         ..Default::default()
     };
-    
+
     let stats = docker.stats(container_id, Some(stats_options));
     tokio::pin!(stats);
-    
+
     if let Some(Ok(stat)) = stats.next().await {
-        let cpu_delta = stat.cpu_stats.cpu_usage.total_usage as f64 - 
-                       stat.precpu_stats.cpu_usage.total_usage as f64;
-        let system_delta = stat.cpu_stats.system_cpu_usage.unwrap_or(0) as f64 - 
-                          stat.precpu_stats.system_cpu_usage.unwrap_or(0) as f64;
-        
+        let cpu_delta = stat.cpu_stats.cpu_usage.total_usage as f64
+            - stat.precpu_stats.cpu_usage.total_usage as f64;
+        let system_delta = stat.cpu_stats.system_cpu_usage.unwrap_or(0) as f64
+            - stat.precpu_stats.system_cpu_usage.unwrap_or(0) as f64;
+
         let cpu_usage = if system_delta > 0.0 && cpu_delta > 0.0 {
             (cpu_delta / system_delta) * 100.0 * stat.cpu_stats.online_cpus.unwrap_or(1) as f64
         } else {
             0.0
         };
-        
+
         let memory_usage = stat.memory_stats.usage.unwrap_or(0);
-        
+
         Ok((cpu_usage, memory_usage))
     } else {
         Err("Failed to get container stats".into())
@@ -154,7 +157,7 @@ async fn test_proxy(
             if Instant::now().duration_since(start_time).as_secs() % 1 == 0 {
                 match get_container_stats(docker, container).await {
                     Ok((cpu, memory)) => Some((cpu, memory)),
-                    Err(_) => None
+                    Err(_) => None,
                 }
             } else {
                 None
@@ -165,56 +168,61 @@ async fn test_proxy(
 
         let mut batch_successful = 0;
         let mut batch_failed = 0;
-        
+
         let futures = (0..concurrent_connections).map(|_| {
             let permit = semaphore.clone().acquire_owned();
             let client = client.clone();
-            let url = format!("{}/proxy/stream?d={}&api_password={}", 
-                proxy_url, video_url, api_password);
+            let url = format!(
+                "{}/proxy/stream?d={}&api_password={}",
+                proxy_url, video_url, api_password
+            );
             let total_bytes = Arc::clone(&total_bytes);
             let peak_speed = Arc::clone(&peak_speed);
-            
+
             async move {
                 // Wait for semaphore permit
                 let _permit = permit.await.unwrap();
                 let start = Instant::now();
-                match client.get(&url)
+                match client
+                    .get(&url)
                     .timeout(Duration::from_secs(10))
                     .send()
-                    .await {
+                    .await
+                {
                     Ok(response) => {
                         if response.status().is_success() {
                             // Stream the response instead of loading it all into memory
                             let mut stream = response.bytes_stream();
                             let mut bytes_len = 0u64;
-                            
+
                             while let Ok(Some(chunk)) = stream.try_next().await {
                                 bytes_len += chunk.len() as u64;
                             }
-                            
+
                             let duration = start.elapsed();
-                            let speed_mbps = (bytes_len as f64 * 8.0) / (duration.as_secs_f64() * 1_000_000.0);
-                            
+                            let speed_mbps =
+                                (bytes_len as f64 * 8.0) / (duration.as_secs_f64() * 1_000_000.0);
+
                             let mut total = total_bytes.lock().await;
                             *total += bytes_len;
-                            
+
                             let mut peak = peak_speed.lock().await;
                             if speed_mbps > *peak {
                                 *peak = speed_mbps;
                             }
-                            
+
                             Ok((duration, bytes_len))
                         } else {
                             Err("Request failed")
                         }
                     }
-                    Err(_) => Err("Request failed")
+                    Err(_) => Err("Request failed"),
                 }
             }
         });
 
         let results: Vec<Result<(Duration, u64), &str>> = futures::future::join_all(futures).await;
-        
+
         let mut metrics_lock = recent_metrics.lock().await;
         // Keep only recent metrics to avoid memory growth
         if metrics_lock.len() > 1000 {
@@ -255,9 +263,7 @@ async fn test_proxy(
 
     // Calculate results
     let (avg_cpu, max_cpu) = if container_name.is_some() {
-        let cpu_metrics: Vec<f64> = metrics.iter()
-            .filter_map(|m| m.cpu_usage)
-            .collect();
+        let cpu_metrics: Vec<f64> = metrics.iter().filter_map(|m| m.cpu_usage).collect();
         if !cpu_metrics.is_empty() {
             let avg = cpu_metrics.iter().sum::<f64>() / cpu_metrics.len() as f64;
             let max = cpu_metrics.iter().fold(0.0_f64, |a, &b| a.max(b));
@@ -270,9 +276,7 @@ async fn test_proxy(
     };
 
     let (avg_memory, max_memory) = if container_name.is_some() {
-        let mem_metrics: Vec<u64> = metrics.iter()
-            .filter_map(|m| m.memory_usage)
-            .collect();
+        let mem_metrics: Vec<u64> = metrics.iter().filter_map(|m| m.memory_usage).collect();
         if !mem_metrics.is_empty() {
             let avg = mem_metrics.iter().sum::<u64>() / mem_metrics.len() as u64;
             let max = mem_metrics.iter().fold(0, |a, &b| a.max(b));
@@ -286,8 +290,16 @@ async fn test_proxy(
 
     let response_times: Vec<Duration> = metrics.iter().map(|m| m.response_time).collect();
     let avg_response_time = response_times.iter().sum::<Duration>() / response_times.len() as u32;
-    let min_response_time = response_times.iter().min().copied().unwrap_or(Duration::ZERO);
-    let max_response_time = response_times.iter().max().copied().unwrap_or(Duration::ZERO);
+    let min_response_time = response_times
+        .iter()
+        .min()
+        .copied()
+        .unwrap_or(Duration::ZERO);
+    let max_response_time = response_times
+        .iter()
+        .max()
+        .copied()
+        .unwrap_or(Duration::ZERO);
 
     let total_bytes = *total_bytes.lock().await;
     let test_duration = Duration::from_secs(duration);
@@ -319,7 +331,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
         .timeout(Duration::from_secs(args.request_timeout))
         .pool_idle_timeout(Duration::from_secs(args.duration + 10))
         .build()?;
-        
+
     // Only connect to Docker if container names are provided
     let docker = if args.proxy1_container.is_some() || args.proxy2_container.is_some() {
         Some(bollard::Docker::connect_with_local_defaults()?)
@@ -339,7 +351,8 @@ async fn main() -> Result<(), Box<dyn Error>> {
         args.proxy1_container.as_deref(),
         args.concurrent_connections,
         args.duration,
-    ).await?;
+    )
+    .await?;
 
     // Wait between tests
     sleep(Duration::from_secs(5)).await;
@@ -354,71 +367,107 @@ async fn main() -> Result<(), Box<dyn Error>> {
         args.proxy2_container.as_deref(),
         args.concurrent_connections,
         args.duration,
-    ).await?;
+    )
+    .await?;
 
     // Print results
     println!("\nBenchmark Results:");
     println!("=================");
-    
+
     println!("\n{}:", args.proxy1_name);
     if args.proxy1_container.is_some() {
-        println!("  CPU Usage: {:.2}% avg, {:.2}% max", 
-            proxy1_results.avg_cpu.unwrap_or(0.0), 
-            proxy1_results.max_cpu.unwrap_or(0.0));
-        println!("  Memory Usage: {} MB avg, {} MB max", 
+        println!(
+            "  CPU Usage: {:.2}% avg, {:.2}% max",
+            proxy1_results.avg_cpu.unwrap_or(0.0),
+            proxy1_results.max_cpu.unwrap_or(0.0)
+        );
+        println!(
+            "  Memory Usage: {} MB avg, {} MB max",
             proxy1_results.avg_memory.unwrap_or(0) / 1024 / 1024,
-            proxy1_results.max_memory.unwrap_or(0) / 1024 / 1024);
+            proxy1_results.max_memory.unwrap_or(0) / 1024 / 1024
+        );
     }
-    println!("  Response Time: {:?} avg, {:?} min, {:?} max",
+    println!(
+        "  Response Time: {:?} avg, {:?} min, {:?} max",
         proxy1_results.avg_response_time,
         proxy1_results.min_response_time,
-        proxy1_results.max_response_time);
-    println!("  Transfer Speed: {:.2} Mbps avg, {:.2} Mbps peak",
-        proxy1_results.avg_speed_mbps,
-        proxy1_results.peak_speed_mbps);
-    println!("  Total Data Transferred: {:.2} MB",
-        proxy1_results.total_bytes_transferred as f64 / 1024.0 / 1024.0);
-    println!("  Requests: {} successful, {} failed",
-        proxy1_results.successful_requests,
-        proxy1_results.failed_requests);
+        proxy1_results.max_response_time
+    );
+    println!(
+        "  Transfer Speed: {:.2} Mbps avg, {:.2} Mbps peak",
+        proxy1_results.avg_speed_mbps, proxy1_results.peak_speed_mbps
+    );
+    println!(
+        "  Total Data Transferred: {:.2} MB",
+        proxy1_results.total_bytes_transferred as f64 / 1024.0 / 1024.0
+    );
+    println!(
+        "  Requests: {} successful, {} failed",
+        proxy1_results.successful_requests, proxy1_results.failed_requests
+    );
 
     println!("\n{}:", args.proxy2_name);
     if args.proxy2_container.is_some() {
-        println!("  CPU Usage: {:.2}% avg, {:.2}% max", 
-            proxy2_results.avg_cpu.unwrap_or(0.0), 
-            proxy2_results.max_cpu.unwrap_or(0.0));
-        println!("  Memory Usage: {} MB avg, {} MB max",
+        println!(
+            "  CPU Usage: {:.2}% avg, {:.2}% max",
+            proxy2_results.avg_cpu.unwrap_or(0.0),
+            proxy2_results.max_cpu.unwrap_or(0.0)
+        );
+        println!(
+            "  Memory Usage: {} MB avg, {} MB max",
             proxy2_results.avg_memory.unwrap_or(0) / 1024 / 1024,
-            proxy2_results.max_memory.unwrap_or(0) / 1024 / 1024);
+            proxy2_results.max_memory.unwrap_or(0) / 1024 / 1024
+        );
     }
-    println!("  Response Time: {:?} avg, {:?} min, {:?} max",
+    println!(
+        "  Response Time: {:?} avg, {:?} min, {:?} max",
         proxy2_results.avg_response_time,
         proxy2_results.min_response_time,
-        proxy2_results.max_response_time);
-    
-        println!("  Transfer Speed: {:.2} Mbps avg, {:.2} Mbps peak",
-        proxy2_results.avg_speed_mbps,
-        proxy2_results.peak_speed_mbps);
-    println!("  Total Data Transferred: {:.2} MB",
-        proxy2_results.total_bytes_transferred as f64 / 1024.0 / 1024.0);
-    println!("  Requests: {} successful, {} failed",
-        proxy2_results.successful_requests,
-        proxy2_results.failed_requests);
+        proxy2_results.max_response_time
+    );
+
+    println!(
+        "  Transfer Speed: {:.2} Mbps avg, {:.2} Mbps peak",
+        proxy2_results.avg_speed_mbps, proxy2_results.peak_speed_mbps
+    );
+    println!(
+        "  Total Data Transferred: {:.2} MB",
+        proxy2_results.total_bytes_transferred as f64 / 1024.0 / 1024.0
+    );
+    println!(
+        "  Requests: {} successful, {} failed",
+        proxy2_results.successful_requests, proxy2_results.failed_requests
+    );
 
     // Print performance comparison
-    println!("\nPerformance Comparison ({} vs {}):", args.proxy2_name, args.proxy1_name);
-    println!("  Response Time: {:.2}x faster", 
-        proxy1_results.avg_response_time.as_secs_f64() / proxy2_results.avg_response_time.as_secs_f64());
-    println!("  Transfer Speed: {:.2}x faster",
-        proxy2_results.avg_speed_mbps / proxy1_results.avg_speed_mbps);
-    println!("  Request Throughput: {:.2}x higher",
-        proxy2_results.successful_requests as f64 / proxy1_results.successful_requests as f64);
+    println!(
+        "\nPerformance Comparison ({} vs {}):",
+        args.proxy2_name, args.proxy1_name
+    );
+    println!(
+        "  Response Time: {:.2}x faster",
+        proxy1_results.avg_response_time.as_secs_f64()
+            / proxy2_results.avg_response_time.as_secs_f64()
+    );
+    println!(
+        "  Transfer Speed: {:.2}x faster",
+        proxy2_results.avg_speed_mbps / proxy1_results.avg_speed_mbps
+    );
+    println!(
+        "  Request Throughput: {:.2}x higher",
+        proxy2_results.successful_requests as f64 / proxy1_results.successful_requests as f64
+    );
 
     if args.proxy1_container.is_some() && args.proxy2_container.is_some() {
-        println!("  CPU Usage: {:.2}x lower", 
-            proxy1_results.avg_cpu.unwrap_or(0.0) / proxy2_results.avg_cpu.unwrap_or(1.0));
-        println!("  Memory Usage: {:.2}x lower",
-            proxy1_results.avg_memory.unwrap_or(0) as f64 / proxy2_results.avg_memory.unwrap_or(1) as f64);
+        println!(
+            "  CPU Usage: {:.2}x lower",
+            proxy1_results.avg_cpu.unwrap_or(0.0) / proxy2_results.avg_cpu.unwrap_or(1.0)
+        );
+        println!(
+            "  Memory Usage: {:.2}x lower",
+            proxy1_results.avg_memory.unwrap_or(0) as f64
+                / proxy2_results.avg_memory.unwrap_or(1) as f64
+        );
     }
 
     Ok(())
