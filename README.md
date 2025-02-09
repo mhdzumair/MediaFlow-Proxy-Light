@@ -29,7 +29,7 @@ This is a lightweight Rust implementation of [MediaFlow Proxy](https://github.co
 
 ## Installation
 
-Download the latest release for your platform from the [Releases](https://gitlab.com/mhdzumair/mediaflow-proxy-light/-/releases) page:
+Download the latest release for your platform from the [Releases](https://github.com/mhdzumair/MediaFlow-Proxy-Light/releases) page:
 
 - Linux: `mediaflow-proxy-light-linux-x86_64.tar.gz`
 - Windows: `mediaflow-proxy-light-windows-x86_64.zip`
