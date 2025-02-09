@@ -31,9 +31,16 @@ This is a lightweight Rust implementation of [MediaFlow Proxy](https://github.co
 
 Download the latest release for your platform from the [Releases](https://github.com/mhdzumair/MediaFlow-Proxy-Light/releases) page:
 
-- Linux: `mediaflow-proxy-light-linux-x86_64.tar.gz`
-- Windows: `mediaflow-proxy-light-windows-x86_64.zip`
-- macOS: `mediaflow-proxy-light-macos-x86_64.tar.gz`
+### Linux
+- AMD64 (x86_64): `mediaflow-proxy-light-linux-x86_64`
+- ARM64 (aarch64): `mediaflow-proxy-light-linux-aarch64`
+
+### macOS
+- Intel (x86_64): `mediaflow-proxy-light-macos-x86_64`
+- Apple Silicon (M1/M2): `mediaflow-proxy-light-macos-aarch64`
+
+### Windows
+- 64-bit: `mediaflow-proxy-light-windows-x86_64.exe`
 
 ### Using Docker
 
@@ -45,6 +52,27 @@ docker run -d \
   -e APP__AUTH__API_PASSWORD=your-secure-password \
   ghcr.io/mhdzumair/mediaflow-proxy-light:latest
 ```
+
+The Docker image supports both `linux/amd64` and `linux/arm64` platforms.
+
+### Installation Steps
+
+#### Linux/macOS
+```bash
+# Download the binary (replace with your platform's binary name)
+wget https://github.com/mhdzumair/MediaFlow-Proxy-Light/releases/latest/download/mediaflow-proxy-light-linux-x86_64
+
+# Make it executable
+chmod +x mediaflow-proxy-light-linux-x86_64
+
+# Optional: Move to system path
+sudo mv mediaflow-proxy-light-linux-x86_64 /usr/local/bin/mediaflow-proxy-light
+```
+
+#### Windows
+1. Download the `.exe` file
+2. Place it in your desired location
+3. Run from command prompt or PowerShell
 
 ## Configuration
 

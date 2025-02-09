@@ -24,23 +24,23 @@ jobs:
           - os: ubuntu-latest
             target: x86_64-unknown-linux-gnu
             artifact_name: mediaflow-proxy-light
-            asset_name: mediaflow-proxy-light-linux-x86_64.tar.gz
+            asset_name: mediaflow-proxy-light-linux-x86_64
           - os: ubuntu-latest
             target: aarch64-unknown-linux-gnu
             artifact_name: mediaflow-proxy-light
-            asset_name: mediaflow-proxy-light-linux-aarch64.tar.gz
+            asset_name: mediaflow-proxy-light-linux-aarch64
           - os: macos-latest
             target: x86_64-apple-darwin
             artifact_name: mediaflow-proxy-light
-            asset_name: mediaflow-proxy-light-macos-x86_64.tar.gz
+            asset_name: mediaflow-proxy-light-macos-x86_64
           - os: macos-latest
             target: aarch64-apple-darwin
             artifact_name: mediaflow-proxy-light
-            asset_name: mediaflow-proxy-light-macos-aarch64.tar.gz
+            asset_name: mediaflow-proxy-light-macos-aarch64
           - os: windows-latest
             target: x86_64-pc-windows-msvc
             artifact_name: mediaflow-proxy-light.exe
-            asset_name: mediaflow-proxy-light-windows-x86_64.zip
+            asset_name: mediaflow-proxy-light-windows-x86_64.exe
 
     steps:
       - uses: actions/checkout@v4
@@ -69,27 +69,11 @@ jobs:
       - name: Build
         run: cargo build --release --target ${{ matrix.target }}
 
-      - name: Prepare archive (Unix)
-        if: matrix.os != 'windows-latest'
-        run: |
-          mkdir release
-          cp target/${{ matrix.target }}/release/${{ matrix.artifact_name }} release/
-          cd release
-          tar czf ../${{ matrix.asset_name }} *
-
-      - name: Prepare archive (Windows)
-        if: matrix.os == 'windows-latest'
-        run: |
-          mkdir release
-          copy target\${{ matrix.target }}\release\${{ matrix.artifact_name }} release\
-          cd release
-          7z a ../${{ matrix.asset_name }} *
-
       - name: Upload binary to release
         uses: svenstaro/upload-release-action@v2
         with:
           repo_token: ${{ secrets.GITHUB_TOKEN }}
-          file: ${{ matrix.asset_name }}
+          file: target/${{ matrix.target }}/release/${{ matrix.artifact_name }}
           asset_name: ${{ matrix.asset_name }}
           tag: ${{ github.ref }}
           overwrite: true
