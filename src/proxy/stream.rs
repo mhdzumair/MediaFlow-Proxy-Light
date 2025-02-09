@@ -6,9 +6,8 @@ use tokio::time::{timeout, Duration};
 use tracing::{error, info};
 
 use crate::{
-    config::ProxyConfig,
+    config::{ProxyConfig, ProxyRouter},
     error::{AppError, AppResult},
-    proxy::config::ProxyRouter,
 };
 
 #[derive(Clone)]

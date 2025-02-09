@@ -30,7 +30,8 @@ async fn handle_proxy_request(
             request_headers.insert(
                 HeaderName::from_str(header_name)
                     .map_err(|e| AppError::Internal(format!("Invalid header name: {}", e)))?,
-                value.clone(),
+                HeaderValue::try_from(value.as_bytes())
+                    .map_err(|e| AppError::Internal(format!("Invalid header value: {}", e)))?,
             );
         }
     }
@@ -67,7 +68,11 @@ async fn handle_proxy_request(
     // Add supported headers from upstream response
     for &header_name in SUPPORTED_RESPONSE_HEADERS {
         if let Some(value) = upstream_headers.get(header_name) {
-            response.insert_header((header_name, value.clone()));
+            if let Ok(converted_value) =
+                actix_web::http::header::HeaderValue::from_str(value.to_str().unwrap_or_default())
+            {
+                response.insert_header((header_name, converted_value));
+            }
         }
     }
 
@@ -86,9 +91,9 @@ async fn handle_proxy_request(
         {
             if let Some(value_str) = value.as_str() {
                 response.insert_header((
-                    HeaderName::from_str(key)
+                    actix_web::http::header::HeaderName::from_str(key)
                         .map_err(|e| AppError::Internal(format!("Invalid header name: {}", e)))?,
-                    HeaderValue::from_str(value_str)
+                    actix_web::http::header::HeaderValue::from_str(value_str)
                         .map_err(|e| AppError::Internal(format!("Invalid header value: {}", e)))?,
                 ));
             }

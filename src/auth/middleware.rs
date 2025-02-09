@@ -161,7 +161,8 @@ where
                                 query_params
                                     .iter()
                                     .filter_map(|(k, v)| {
-                                        k.strip_prefix("h_").map(|stripped| (stripped.to_string(), v.clone()))
+                                        k.strip_prefix("h_")
+                                            .map(|stripped| (stripped.to_string(), v.clone()))
                                     })
                                     .collect(),
                             )),
@@ -169,7 +170,8 @@ where
                                 query_params
                                     .iter()
                                     .filter_map(|(k, v)| {
-                                        k.strip_prefix("r_").map(|stripped| (stripped.to_string(), v.clone()))
+                                        k.strip_prefix("r_")
+                                            .map(|stripped| (stripped.to_string(), v.clone()))
                                     })
                                     .collect(),
                             )),

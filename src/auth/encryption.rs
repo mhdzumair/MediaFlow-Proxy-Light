@@ -49,7 +49,7 @@ impl EncryptionHandler {
 
         // Generate random IV
         let mut iv = [0u8; 16];
-        rand::thread_rng().fill_bytes(&mut iv);
+        rand::rng().fill_bytes(&mut iv);
 
         // Pad the data
         let padded_data = self.pad_data(&json_data);
