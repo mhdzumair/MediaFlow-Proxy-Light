@@ -43,7 +43,7 @@ docker run -d \
   -e APP__SERVER__HOST=0.0.0.0 \
   -e APP__SERVER__PORT=8888 \
   -e APP__AUTH__API_PASSWORD=your-secure-password \
-  registry.gitlab.com/your-project/mediaflow-proxy-light:latest
+  ghcr.io/mhdzumair/mediaflow-proxy-light:latest
 ```
 
 ## Configuration

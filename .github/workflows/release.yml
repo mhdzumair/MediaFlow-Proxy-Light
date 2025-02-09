@@ -1,0 +1,125 @@
+name: Release
+
+on:
+  release:
+    types: [ created ]
+
+env:
+  CARGO_TERM_COLOR: always
+  RUST_VERSION: 1.84.0
+  DOCKER_IMAGE: ghcr.io/${{ github.repository }}
+
+jobs:
+  build-binaries:
+    name: Build ${{ matrix.target }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            target: x86_64-unknown-linux-gnu
+            artifact_name: mediaflow-proxy-light
+            asset_name: mediaflow-proxy-light-linux-x86_64.tar.gz
+          - os: ubuntu-latest
+            target: aarch64-unknown-linux-gnu
+            artifact_name: mediaflow-proxy-light
+            asset_name: mediaflow-proxy-light-linux-aarch64.tar.gz
+          - os: macos-latest
+            target: x86_64-apple-darwin
+            artifact_name: mediaflow-proxy-light
+            asset_name: mediaflow-proxy-light-macos-x86_64.tar.gz
+          - os: macos-latest
+            target: aarch64-apple-darwin
+            artifact_name: mediaflow-proxy-light
+            asset_name: mediaflow-proxy-light-macos-aarch64.tar.gz
+          - os: windows-latest
+            target: x86_64-pc-windows-msvc
+            artifact_name: mediaflow-proxy-light.exe
+            asset_name: mediaflow-proxy-light-windows-x86_64.zip
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: ${{ env.RUST_VERSION }}
+          targets: ${{ matrix.target }}
+
+      - name: Install cross-compilation tools
+        if: matrix.target == 'aarch64-unknown-linux-gnu'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y gcc-aarch64-linux-gnu
+
+      - name: Build
+        run: cargo build --release --target ${{ matrix.target }}
+
+      - name: Prepare archive (Unix)
+        if: matrix.os != 'windows-latest'
+        run: |
+          mkdir release
+          cp target/${{ matrix.target }}/release/${{ matrix.artifact_name }} release/
+          cd release
+          tar czf ../${{ matrix.asset_name }} *
+
+      - name: Prepare archive (Windows)
+        if: matrix.os == 'windows-latest'
+        run: |
+          mkdir release
+          copy target\${{ matrix.target }}\release\${{ matrix.artifact_name }} release\
+          cd release
+          7z a ../${{ matrix.asset_name }} *
+
+      - name: Upload binary to release
+        uses: svenstaro/upload-release-action@v2
+        with:
+          repo_token: ${{ secrets.GITHUB_TOKEN }}
+          file: ${{ matrix.asset_name }}
+          asset_name: ${{ matrix.asset_name }}
+          tag: ${{ github.ref }}
+          overwrite: true
+
+  build-docker:
+    name: Build and push Docker image
+    runs-on: ubuntu-latest
+    needs: build-binaries
+    permissions:
+      contents: read
+      packages: write
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Login to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Extract metadata for Docker
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.DOCKER_IMAGE }}
+          tags: |
+            type=ref,event=tag
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
+
+      - name: Build and push
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          platforms: linux/amd64,linux/arm64
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
