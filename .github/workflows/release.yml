@@ -9,6 +9,10 @@ env:
   RUST_VERSION: 1.84.0
   DOCKER_IMAGE: ghcr.io/${{ github.repository }}
 
+permissions:
+  contents: write    # Required for creating releases and uploading assets
+  packages: write    # Required for pushing to GitHub Container Registry
+
 jobs:
   build-binaries:
     name: Build ${{ matrix.target }}
