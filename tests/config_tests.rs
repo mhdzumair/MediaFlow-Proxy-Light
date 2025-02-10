@@ -32,20 +32,15 @@ fn test_config_from_env() {
 fn test_transport_routes_config() {
     setup();
 
-    // Set transport routes with properly formatted JSON
-    let routes_json = r#"{
-        "all://*.streaming.com": {
-            "proxy": true,
-            "proxy_url": "socks5://test-proxy:1080",
-            "verify_ssl": true
-        }
-    }"#;
+    // Modify the JSON string to be a single line with escaped quotes
+    let routes_json = r#"{"all://*.streaming.com":{"proxy":true,"proxy_url":"socks5://test-proxy:1080","verify_ssl":true}}"#;
 
     env::set_var("APP__PROXY__TRANSPORT_ROUTES", routes_json);
 
     let config = Config::from_env().unwrap();
 
-    // Debug print the parsed routes
+    // Add debug prints to help diagnose the issue
+    println!("Environment variable value: {}", env::var("APP__PROXY__TRANSPORT_ROUTES").unwrap_or_default());
     println!("Parsed routes: {:?}", config.proxy.transport_routes);
 
     let routes = config.proxy.transport_routes;
