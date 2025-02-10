@@ -40,7 +40,10 @@ fn test_transport_routes_config() {
     let config = Config::from_env().unwrap();
 
     // Add debug prints to help diagnose the issue
-    println!("Environment variable value: {}", env::var("APP__PROXY__TRANSPORT_ROUTES").unwrap_or_default());
+    println!(
+        "Environment variable value: {}",
+        env::var("APP__PROXY__TRANSPORT_ROUTES").unwrap_or_default()
+    );
     println!("Parsed routes: {:?}", config.proxy.transport_routes);
 
     let routes = config.proxy.transport_routes;
