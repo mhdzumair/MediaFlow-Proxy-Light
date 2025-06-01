@@ -51,19 +51,33 @@ jobs:
           toolchain: ${{ env.RUST_VERSION }}
           targets: ${{ matrix.target }}
 
-      - name: Install cross-compilation tools
+      - name: Setup ARM64 cross-compilation
         if: matrix.target == 'aarch64-unknown-linux-gnu'
         run: |
-          sudo apt-get update
-          sudo apt-get install -y gcc-aarch64-linux-gnu
-
-      - name: Set up cross-compilation environment
-        if: matrix.target == 'aarch64-unknown-linux-gnu'
-        run: |
-          echo "CARGO_TARGET_AARCH64_UNKNOWN_LINUX_GNU_LINKER=aarch64-linux-gnu-gcc" >> $GITHUB_ENV
+          # Try to install cross, fallback to manual setup if it fails
+          if ! timeout 300 cargo install cross --git https://github.com/cross-rs/cross; then
+            echo "Cross installation failed, setting up manual cross-compilation"
+            sudo apt-get update
+            sudo apt-get install -y gcc-aarch64-linux-gnu
+            echo "CARGO_TARGET_AARCH64_UNKNOWN_LINUX_GNU_LINKER=aarch64-linux-gnu-gcc" >> $GITHUB_ENV
+            echo "USE_CROSS=false" >> $GITHUB_ENV
+          else
+            echo "Cross installed successfully"
+            echo "USE_CROSS=true" >> $GITHUB_ENV
+          fi
 
       - name: Build
-        run: cargo build --release --target ${{ matrix.target }}
+        run: |
+          if [ "${{ matrix.target }}" = "aarch64-unknown-linux-gnu" ]; then
+            if [ "$USE_CROSS" = "true" ]; then
+              cross build --release --target ${{ matrix.target }}
+            else
+              # Use vendored OpenSSL for cross-compilation
+              OPENSSL_STATIC=1 OPENSSL_VENDORED=1 cargo build --release --target ${{ matrix.target }}
+            fi
+          else
+            cargo build --release --target ${{ matrix.target }}
+          fi
 
       - name: Upload binary to release
         uses: svenstaro/upload-release-action@v2
