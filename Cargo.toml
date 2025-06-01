@@ -5,6 +5,7 @@ edition = "2021"
 
 [features]
 default = []
+vendored-openssl = ["openssl/vendored"]
 benchmark = [
     "dep:bollard",
     "dep:futures-util",
@@ -36,6 +37,7 @@ time = "0.3"
 url = "2.5"
 regex = "1.10"
 urlencoding = "2.1.3"
+openssl = { version = "0.10", features = ["vendored"], optional = true }
 
 # Benchmark-only dependencies
 clap = { version = "4.4", features = ["derive"], optional = true }

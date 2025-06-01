@@ -17,7 +17,7 @@ RUN mkdir src && \
     echo "pub fn add(left: usize, right: usize) -> usize { left + right }" > src/lib.rs
 
 # Build dependencies (this layer will be cached unless Cargo.toml/Cargo.lock changes)
-RUN cargo build --release && \
+RUN cargo build --release --features vendored-openssl && \
     rm -rf src target/release/deps/mediaflow*
 
 # Copy source code
@@ -25,7 +25,7 @@ COPY src ./src
 COPY tools ./tools
 
 # Build the actual application
-RUN cargo build --release
+RUN cargo build --release --features vendored-openssl
 
 # Runtime stage - use distroless for smaller size and better security
 FROM gcr.io/distroless/cc-debian11
