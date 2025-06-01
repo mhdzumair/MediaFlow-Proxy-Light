@@ -1,3 +1,4 @@
+use actix_cors::Cors;
 use actix_web::middleware::Logger;
 use actix_web::{dev::Service, middleware, web, App, HttpServer};
 use futures::FutureExt;
@@ -55,7 +56,24 @@ async fn main() -> std::io::Result<()> {
     HttpServer::new(move || {
         let config = Arc::clone(&server_config);
 
+        // Configure CORS
+        let cors = if config.server.cors.enabled {
+            if config.server.cors.allow_any_origin {
+                Cors::permissive()
+            } else {
+                let mut cors = Cors::default();
+                for origin in &config.server.cors.allowed_origins {
+                    cors = cors.allowed_origin(origin);
+                }
+                cors.max_age(config.server.cors.max_age)
+            }
+        } else {
+            Cors::default()
+        };
+
         App::new()
+            // Enable CORS middleware
+            .wrap(cors)
             // Enable enhanced logger middleware
             .wrap(Logger::new("[%t] \"%r\" %s %b \"%{Referer}i\" %T"))
             .wrap(middleware::Compress::default())

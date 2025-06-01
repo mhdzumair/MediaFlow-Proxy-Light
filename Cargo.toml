@@ -45,6 +45,7 @@ bollard = { version = "0.15", optional = true }
 futures-util = { version = "0.3", optional = true }
 sysinfo = { version = "0.29", optional = true }
 criterion = { version = "0.5", features = ["async_tokio"], optional = true }
+actix-cors = "0.7.1"
 
 [dev-dependencies]
 tokio-test = "0.4"
