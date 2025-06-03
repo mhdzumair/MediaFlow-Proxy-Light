@@ -56,66 +56,19 @@ async fn main() -> std::io::Result<()> {
     HttpServer::new(move || {
         let config = Arc::clone(&server_config);
 
-        // Configure CORS
-        let cors = if config.server.cors.enabled {
-            if config.server.cors.allow_any_origin {
-                Cors::permissive()
-            } else {
-                let mut cors = Cors::default();
-                for origin in &config.server.cors.allowed_origins {
-                    cors = cors.allowed_origin(origin);
-                }
-                cors.max_age(config.server.cors.max_age)
-            }
-        } else {
-            Cors::default()
-        };
+        // Configure CORS to allow all domains
+        let cors = Cors::permissive();
 
         App::new()
             // Enable CORS middleware
             .wrap(cors)
-            // Enable enhanced logger middleware
-            .wrap(Logger::new("[%t] \"%r\" %s %b \"%{Referer}i\" %T"))
+            // FastAPI-style access logs: IP:PORT - "METHOD PATH HTTP/VERSION" STATUS_CODE
+            .wrap(Logger::new("%a - \"%r\" %s"))
             .wrap(middleware::Compress::default())
             .wrap(auth_middleware.clone())
             // Register shared data
             .app_data(web::Data::new(stream_manager.clone()))
             .app_data(web::Data::new(config))
-            // Register request tracing middleware
-            .wrap_fn(|req, srv| {
-                let path = req.path().to_string();
-                let method = req.method().to_string();
-                let start_time = std::time::Instant::now();
-                let remote_addr = req
-                    .connection_info()
-                    .realip_remote_addr()
-                    .unwrap_or("unknown")
-                    .to_string();
-
-                tracing::info!(
-                    target: "request",
-                    %method,
-                    %path,
-                    %remote_addr,
-                    "Incoming request"
-                );
-
-                srv.call(req).map(move |res| {
-                    if let Ok(res) = &res {
-                        let duration = start_time.elapsed();
-                        tracing::info!(
-                            target: "request",
-                            %method,
-                            %path,
-                            status = res.status().as_u16(),
-                            %remote_addr,
-                            ?duration,
-                            "Request completed"
-                        );
-                    }
-                    res
-                })
-            })
             // Configure routes
             .service(
                 web::scope("/proxy")
@@ -127,7 +80,6 @@ async fn main() -> std::io::Result<()> {
             .service(web::scope("/health").route("", web::get().to(|| async { "OK" })))
             // Configure default error handlers
             .default_service(web::route().to(|| async {
-                tracing::warn!(target: "request", "Not found request");
                 actix_web::HttpResponse::NotFound().json(serde_json::json!({
                     "error": "Not Found"
                 }))

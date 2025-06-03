@@ -3,16 +3,10 @@ host = "0.0.0.0"
 port = 8888
 workers = 4  # Number of worker threads. Defaults to number of CPU cores
 
-[server.cors]
-enabled = true
-allow_any_origin = true  # Allow all domains (*) - set to false for production
-allowed_origins = []     # Specific origins when allow_any_origin = false
-max_age = 3600          # CORS preflight cache duration in seconds
-
 [proxy]
 connect_timeout = 30  # Connection timeout in seconds
 follow_redirects = true
-buffer_size = 8192    # Streaming buffer size in bytes
+buffer_size = 262144    # Streaming buffer size in bytes
 proxy_url = ""  # Default proxy URL. Supported http/https/socks4/socks5
 all_proxy = false
 

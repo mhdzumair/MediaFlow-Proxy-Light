@@ -11,44 +11,9 @@ pub struct ServerConfig {
     pub host: String,
     pub port: u16,
     pub workers: usize,
-    #[serde(default)]
-    pub cors: CorsConfig,
 }
 
-#[derive(Debug, Deserialize, Clone)]
-pub struct CorsConfig {
-    #[serde(default = "default_cors_enabled")]
-    pub enabled: bool,
-    #[serde(default)]
-    pub allowed_origins: Vec<String>,
-    #[serde(default = "default_cors_allow_any_origin")]
-    pub allow_any_origin: bool,
-    #[serde(default = "default_cors_max_age")]
-    pub max_age: usize,
-}
 
-impl Default for CorsConfig {
-    fn default() -> Self {
-        Self {
-            enabled: default_cors_enabled(),
-            allowed_origins: Vec::new(),
-            allow_any_origin: default_cors_allow_any_origin(),
-            max_age: default_cors_max_age(),
-        }
-    }
-}
-
-fn default_cors_enabled() -> bool {
-    true
-}
-
-fn default_cors_allow_any_origin() -> bool {
-    true
-}
-
-fn default_cors_max_age() -> usize {
-    3600
-}
 
 #[derive(Debug, Default, Clone, Deserialize, Serialize)]
 pub struct ProxyRouteConfig {
@@ -193,7 +158,7 @@ impl Config {
             .set_default("server.port", 8888)?
             .set_default("server.workers", 4)?
             .set_default("proxy.connect_timeout", 30)?
-            .set_default("proxy.buffer_size", 8192)?
+            .set_default("proxy.buffer_size", 262144)?
             .set_default("proxy.follow_redirects", true)?
             .set_default("proxy.all_proxy", false)?
             .set_default("proxy.transport_routes", HashMap::<String, Value>::new())?
