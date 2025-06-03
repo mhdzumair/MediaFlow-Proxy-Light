@@ -1,7 +1,6 @@
 use actix_cors::Cors;
 use actix_web::middleware::Logger;
-use actix_web::{dev::Service, middleware, web, App, HttpServer};
-use futures::FutureExt;
+use actix_web::{middleware, web, App, HttpServer};
 use std::sync::Arc;
 use tracing_subscriber::{fmt::format::FmtSpan, layer::SubscriberExt, util::SubscriberInitExt};
 
