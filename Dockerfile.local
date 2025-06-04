@@ -1,0 +1,27 @@
+# Dockerfile for using locally built binaries
+# Build the binaries first with: cargo build --release --target x86_64-unknown-linux-gnu
+# Then build docker with: docker build -f Dockerfile.local --build-arg BINARY_PATH=target/x86_64-unknown-linux-gnu/release/mediaflow-proxy-light .
+
+ARG BINARY_PATH=target/release/mediaflow-proxy-light
+
+# Runtime stage - use distroless for smaller size and better security
+FROM gcr.io/distroless/cc-debian11
+
+WORKDIR /app
+
+# Copy the pre-built binary from local build
+ARG BINARY_PATH
+COPY ${BINARY_PATH} /app/mediaflow-proxy-light
+COPY config-example.toml /app/config.toml
+
+# Ensure binary is executable
+USER 0
+RUN chmod +x /app/mediaflow-proxy-light
+USER 1000
+
+ENV RUST_LOG=info
+ENV CONFIG_PATH=/app/config.toml
+
+EXPOSE 8888
+
+ENTRYPOINT ["/app/mediaflow-proxy-light"]

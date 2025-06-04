@@ -90,6 +90,7 @@ jobs:
   build-docker:
     name: Build and push Docker image
     runs-on: ubuntu-latest
+    needs: build-binaries  # Wait for binaries to be uploaded first
     permissions:
       contents: read
       packages: write
@@ -120,10 +121,15 @@ jobs:
             type=semver,pattern={{version}}
             type=semver,pattern={{major}}.{{minor}}
 
-      - name: Build and push
+      - name: Extract release version
+        id: version
+        run: echo "RELEASE_VERSION=${GITHUB_REF#refs/tags/}" >> $GITHUB_OUTPUT
+
+      - name: Build and push (using pre-built binaries)
         uses: docker/build-push-action@v5
         with:
           context: .
+          file: ./Dockerfile.prebuilt
           platforms: linux/amd64,linux/arm64
           push: true
           tags: ${{ steps.meta.outputs.tags }}
@@ -131,4 +137,5 @@ jobs:
           cache-from: type=gha
           cache-to: type=gha,mode=max
           build-args: |
+            RELEASE_VERSION=${{ steps.version.outputs.RELEASE_VERSION }}
             BUILDKIT_INLINE_CACHE=1

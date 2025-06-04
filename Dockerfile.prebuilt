@@ -1,0 +1,42 @@
+# Multi-stage Dockerfile using pre-built binaries
+# This dramatically reduces build time from ~1h to ~30s by using release artifacts
+
+ARG TARGETPLATFORM
+ARG RELEASE_VERSION
+
+# Download stage - fetch the appropriate binary based on target platform
+FROM alpine:3.19 AS downloader
+ARG TARGETPLATFORM
+ARG RELEASE_VERSION
+
+# Install curl for downloading binaries
+RUN apk add --no-cache curl
+
+WORKDIR /tmp
+
+# Download the appropriate binary based on target platform
+RUN case "$TARGETPLATFORM" in \
+    "linux/amd64") BINARY_NAME="mediaflow-proxy-light-linux-x86_64" ;; \
+    "linux/arm64") BINARY_NAME="mediaflow-proxy-light-linux-aarch64" ;; \
+    *) echo "Unsupported platform: $TARGETPLATFORM" && exit 1 ;; \
+    esac && \
+    echo "Downloading binary for $TARGETPLATFORM: $BINARY_NAME" && \
+    curl -L -o mediaflow-proxy-light \
+        "https://github.com/mhdzumair/MediaFlow-Proxy-Light/releases/download/${RELEASE_VERSION}/${BINARY_NAME}" && \
+    chmod +x mediaflow-proxy-light
+
+# Runtime stage - use distroless for smaller size and better security
+FROM gcr.io/distroless/cc-debian11
+
+WORKDIR /app
+
+# Copy the pre-built binary
+COPY --from=downloader /tmp/mediaflow-proxy-light /app/
+COPY config-example.toml /app/config.toml
+
+ENV RUST_LOG=info
+ENV CONFIG_PATH=/app/config.toml
+
+EXPOSE 8888
+
+ENTRYPOINT ["/app/mediaflow-proxy-light"]
